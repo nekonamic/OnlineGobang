@@ -10,6 +10,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.io.Serializable;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 
 class ServerThread extends JFrame {
@@ -48,8 +52,8 @@ class ServerThread extends JFrame {
         add(text);
         pack();
         ServerSocket server = new ServerSocket(2048);
-        int LIMT = 10;
-        while (count < LIMT) {
+        int limit = 10;
+        while (count < limit) {
             Socket client = server.accept();
             ResponseThread clientThread = new ResponseThread(client, this);
             app.execute(clientThread);
@@ -186,5 +190,112 @@ class ServerThread extends JFrame {
             if (client.toString().equals(str))
                 return true;
         return false;
+    }
+}
+
+class Data implements Serializable {
+    private final String password;
+    private int win;
+    private int lose;
+    private int escape;
+
+    public Data(String password, int win, int lose, int escape) {
+        this.password = password;
+        this.win = win;
+        this.lose = lose;
+        this.escape = escape;
+    }
+
+    public String getPassword() {
+        return password;
+
+    }
+
+    public void addWin() {
+        win++;
+    }
+
+    public void addLose() {
+        lose++;
+    }
+
+    public void addEscape() {
+        escape++;
+    }
+
+    public String toString() {
+        return win + " " + lose + " " + escape;
+    }
+}
+
+class ResponseThread implements Runnable {
+    Socket client;
+    DataInputStream in;
+    DataOutputStream out;
+    ServerThread agent;
+    boolean exit = false;
+    private String name;
+    private boolean isGaming = false;
+
+    public ResponseThread(Socket client, ServerThread agent) {
+        this.client = client;
+        this.agent = agent;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String toString() {
+        return name;
+    }
+
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o.getClass() != getClass()) return false;
+        ResponseThread t = (ResponseThread) o;
+        return t.in.equals(in) && t.out.equals(out) && agent == t.agent;
+    }
+
+    public void close() {
+        try {
+            in.close();
+            out.close();
+            client.close();
+        } catch (IOException ignored) {
+        }
+        exit = true;
+    }
+
+    public void setGame(boolean b) {
+        isGaming = b;
+    }
+
+    public boolean isGaming() {
+        return isGaming;
+    }
+
+    public void run() {
+        try {
+            in = new DataInputStream(client.getInputStream());
+            out = new DataOutputStream(client.getOutputStream());
+            try {
+                String mess = in.readUTF();
+                agent.dealWithMessage(mess, this);
+            } catch (IOException ignored) {
+            }
+        } catch (IOException ignored) {
+        }
+        try {
+            if (!exit) out.writeUTF("update " + agent.host);
+        } catch (IOException ignored) {
+        }
+        while (!exit) {
+            try {
+                String mess = in.readUTF();
+                agent.dealWithMessage(mess, this);
+            } catch (IOException ignored) {
+            }
+        }
     }
 }
