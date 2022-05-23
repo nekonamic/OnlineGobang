@@ -1,13 +1,10 @@
-import javax.swing.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.*;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.io.Serializable;
@@ -16,48 +13,48 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 
-class ServerThread extends JFrame {
-
+class ServerThread {
     private final Map<ResponseThread, ResponseThread> map = new HashMap<>();
     private final ArrayList<ResponseThread> clients = new ArrayList<>();
     private final ExecutorService app = Executors.newCachedThreadPool();
     public ArrayList<ResponseThread> host = new ArrayList<>();
-    private ServerSocket server;
-    private ServerSocket verifySocket;
-    private Map<String, Data> IDPass = new HashMap<>();
-    private int count = 0;
+    private static Map<String, Data> IDPass = new HashMap<>();
+
     public ServerThread() throws IOException {
-        super("Server");
         ObjectInputStream objectIn = new ObjectInputStream(new FileInputStream("data.dat"));
         try {
             IDPass = (HashMap<String, Data>) objectIn.readObject();
             objectIn.close();
         } catch (ClassNotFoundException ignored) {
         }
-        setVisible(true);
-        this.addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent arg0) {
+        ServerSocket server = new ServerSocket(7421);
+
+        Thread thread = new Thread(() -> {
+            while (true) {
+                Socket client = null;
                 try {
-                    ObjectOutputStream objectOut = new ObjectOutputStream(new FileOutputStream("data.dat"));
-                    objectOut.writeObject(IDPass);
-                    objectOut.close();
+                    client = server.accept();
                 } catch (IOException ignored) {
                 }
-                app.shutdownNow();
-                System.exit(0);
+                ResponseThread clientThread = new ResponseThread(client, this);
+                app.execute(clientThread);
             }
         });
-        JTextArea text = new JTextArea();
-        text.setText("" + InetAddress.getLocalHost());
-        add(text);
-        pack();
-        ServerSocket server = new ServerSocket(2048);
-        int limit = 10;
-        while (count < limit) {
-            Socket client = server.accept();
-            ResponseThread clientThread = new ResponseThread(client, this);
-            app.execute(clientThread);
+        thread.start();
+        Scanner in = new Scanner(System.in);
+        in.next();
+        thread.interrupt();
+        Save();
+    }
+
+    public static void Save() {
+        try {
+            ObjectOutputStream objectOut = new ObjectOutputStream(new FileOutputStream("data.dat"));
+            objectOut.writeObject(IDPass);
+            objectOut.close();
+        } catch (IOException ignored) {
         }
+        System.exit(0);
     }
 
     public static void main(String[] args) throws IOException {
@@ -96,7 +93,7 @@ class ServerThread extends JFrame {
                 thread.out.writeUTF("refuse");
                 return;
             }
-            thread.out.writeUTF("notrefuse");
+            thread.out.writeUTF("not refuse");
             host.remove(addedHost);
             synchronized (map) {
                 map.put(addedHost, thread);
@@ -156,7 +153,6 @@ class ServerThread extends JFrame {
                 for (int i = 0; i < clients.size(); i++) {
                     clients.get(i).out.writeUTF("client " + clients);
                 }
-                count++;
 
                 thread.out.writeUTF("log " + message[0] + " " + IDPass.get(message[0]));
             } else {
@@ -168,12 +164,12 @@ class ServerThread extends JFrame {
             }
         } else if (str.startsWith("error to log")) {
             thread.close();
-        } else if (str.startsWith("registe")) {
+        } else if (str.startsWith("register")) {
             message = str.substring(8).split(" ");
             if (!IDPass.containsKey(message[0]))
                 IDPass.put(message[0], new Data(message[1], 0, 0, 0));
             else
-                thread.out.writeUTF("repeat registe");
+                thread.out.writeUTF("repeat register");
         } else if (str.startsWith("cancel")) {
             if (map.containsKey(thread)) {
                 map.get(thread).out.writeUTF("cancel " + thread);

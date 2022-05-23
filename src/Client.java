@@ -8,9 +8,7 @@ import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,8 +25,7 @@ class ClientFrame extends JFrame {
     JButton createBtn = new JButton("Create");
     JButton startBtn = new JButton("Start");
     JButton addBtn = new JButton("Join");
-    JButton exitBtn = new JButton("Exit");
-    JButton cancelBtn = new JButton("Cancel Game");
+    JButton cancelBtn = new JButton("Cancel");
     ExecutorService threadRunner = Executors.newFixedThreadPool(1);
     private String name;
     private String peerName;
@@ -69,21 +66,16 @@ class ClientFrame extends JFrame {
         notify.setBorder(BorderFactory.createTitledBorder("Game Info"));
         panel.add(new JScrollPane(user, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
         panel.add(new JScrollPane(notify, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER));
-        JPanel btnPane = new JPanel();
-
-        btnPane.setLayout(new GridLayout(2, 2));
-        btnPane.add(createBtn);
-        btnPane.add(addBtn);
-        btnPane.add(cancelBtn);
-        btnPane.add(exitBtn);
-
         JPanel buttonsPane = new JPanel();
-        buttonsPane.setLayout(new BorderLayout());
-        buttonsPane.add(btnPane);
-        buttonsPane.add(startBtn, BorderLayout.EAST);
+
+        buttonsPane.setLayout(new GridLayout(2, 2));
+        buttonsPane.add(createBtn);
+        buttonsPane.add(addBtn);
+        buttonsPane.add(cancelBtn);
+        buttonsPane.add(startBtn);
+
         panel.add(buttonsPane);
         startBtn.setEnabled(false);
-        //panel.add(startBtn);
         cancelBtn.setEnabled(false);
         cancelBtn.addActionListener(e -> {
             try {
@@ -133,33 +125,20 @@ class ClientFrame extends JFrame {
                 });
                 clientThread.conveyMessage("add " + user.getSelectedIndex());
             } else
-                SwingUtilities.invokeLater(() -> notify.append("Choose a server that not own!" + System.getProperty("line.separator")));
+                SwingUtilities.invokeLater(() -> notify.append("Can't choose a server that not own!" + System.getProperty("line.separator")));
         });
 
-        exitBtn.addActionListener(arg0 -> {
-            clientThread.conveyMessage("exit");
-            clientThread.setExit(true);
-            threadRunner.shutdownNow();
-            System.exit(0);
-        });
         JLabel l = new JLabel();
-        this.setSize(843, 650);
-        BufferedImage icon = new BufferedImage(843, 120, BufferedImage.TYPE_INT_RGB);
-        ImageIcon image = new ImageIcon(icon);
-        l.setIcon(image);
+        this.setSize(730, 530);
         this.add(l, BorderLayout.NORTH);
         this.add(panel, BorderLayout.EAST);
         this.setLocation(150, 40);
         this.setResizable(false);
 
         try {
-            InetAddress.getLocalHost();
-        } catch (UnknownHostException ignored) {
-        }
-        try {
-            InetAddress serverIP = InetAddress.getByName("localhost");
-            int SERVER_PORT = 2048;
-            Socket server = new Socket(serverIP, SERVER_PORT);
+            String SERVER_IP = "localhost";
+            int SERVER_PORT = 7421;
+            Socket server = new Socket(SERVER_IP, SERVER_PORT);
             clientThread = new ClientThread(this, server);
             threadRunner.execute(clientThread);
         } catch (IOException ignored) {
@@ -340,11 +319,11 @@ class ClientThread implements Runnable {
             frame.setTitle("Welcome " + message[0]);
             frame.setInfo(message[0], message[1], message[2], message[3]);
             logFrame.close();
-        } else if (str.startsWith("repeat registe")) {
+        } else if (str.startsWith("repeat register")) {
             JOptionPane.showMessageDialog(null, "This ID has been used", "Message", JOptionPane.ERROR_MESSAGE);
         } else if (str.startsWith("refuse")) {
             JOptionPane.showMessageDialog(null, "This host has been joined");
-        } else if (str.startsWith("notrefuse")) {
+        } else if (str.startsWith("not refuse")) {
             frame.addBtn.setEnabled(false);
             frame.createBtn.setEnabled(false);
 
@@ -442,8 +421,6 @@ class LoginFrame extends JFrame {
         btnP.add(logBtn);
         JButton registerBtn = new JButton("Register");
         btnP.add(registerBtn);
-        JButton exitBtn = new JButton("Exit");
-        btnP.add(exitBtn);
         JPanel p = new JPanel();
         p.setLayout(new GridLayout(0, 1));
         p.add(inPane);
@@ -460,13 +437,12 @@ class LoginFrame extends JFrame {
         });
         registerBtn.addActionListener(arg0 -> {
             try {
-                out.writeUTF("registe " + input.getText() + " " + Arrays.toString(ps.getPassword()));
+                out.writeUTF("register " + input.getText() + " " + Arrays.toString(ps.getPassword()));
                 input.setText("");
                 ps.setText("");
             } catch (IOException ignored) {
             }
         });
-        exitBtn.addActionListener(arg0 -> clientThread.setExit(true));
         pack();
         setVisible(true);
 
@@ -487,23 +463,22 @@ class LoginFrame extends JFrame {
 }
 
 class GobangPane extends JPanel {
-    private static final int LIMT = 20;
+    private static final int limit = 20;
     final private ClientFrame frame;
-    private final int[][] map = new int[LIMT][LIMT];
+    private final int[][] map = new int[limit][limit];
     public boolean mouseAble = true;
     public boolean isVictory = false;
     public boolean isGaming = false;
     private int selfColor;
-    private ImageIcon desktop;
 
     public GobangPane(final ClientFrame frame) {
         this.frame = frame;
         this.setBackground(Color.LIGHT_GRAY);
-        for (int i = 0; i < LIMT; i++)
-            for (int j = 0; j < LIMT; j++)
+        for (int i = 0; i < limit; i++)
+            for (int j = 0; j < limit; j++)
                 map[i][j] = 0;
 
-        this.setPreferredSize(new Dimension(20 * (LIMT + 2), 20 * (LIMT + 2)));
+        this.setPreferredSize(new Dimension(20 * (limit + 2), 20 * (limit + 2)));
         addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 if (mouseAble && isGaming) {
@@ -536,12 +511,12 @@ class GobangPane extends JPanel {
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
         g.translate(20, 20);
-        for (int i = 0; i < LIMT + 2; i++) {
-            g.drawLine(0, i * 20, (LIMT + 1) * 20, i * 20);
-            g.drawLine(i * 20, 0, i * 20, (LIMT + 1) * 20);
+        for (int i = 0; i < limit + 2; i++) {
+            g.drawLine(0, i * 20, (limit + 1) * 20, i * 20);
+            g.drawLine(i * 20, 0, i * 20, (limit + 1) * 20);
         }
-        for (int i = 0; i < LIMT; i++)
-            for (int j = 0; j < LIMT; j++) {
+        for (int i = 0; i < limit; i++)
+            for (int j = 0; j < limit; j++) {
                 if (map[i][j] == 1) g.setColor(Color.BLACK);
                 else if (map[i][j] == -1) g.setColor(Color.WHITE);
                 else continue;
@@ -551,9 +526,9 @@ class GobangPane extends JPanel {
 
     private void addChess(int xPos, int yPos, final int color) {
         map[xPos][yPos] = color;
-        int left = 0, right = 0, leftup = 0, leftdown = 0, rightup = 0, rightdown = 0, up = 0, down = 0, grid = 1;
+        int left = 0, right = 0, leftUp = 0, leftDown = 0, rightUp = 0, rightDown = 0, up = 0, down = 0, grid = 1;
         while (grid <= 4)
-            if (xPos + grid < LIMT && map[xPos + grid][yPos] == color) {
+            if (xPos + grid < limit && map[xPos + grid][yPos] == color) {
                 right++;
                 grid++;
             } else break;
@@ -581,17 +556,17 @@ class GobangPane extends JPanel {
         }
         grid = 1;
         while (grid <= 4)
-            if (xPos + grid < LIMT && yPos + grid < LIMT && map[xPos + grid][yPos + grid] == color) {
-                rightdown++;
+            if (xPos + grid < limit && yPos + grid < limit && map[xPos + grid][yPos + grid] == color) {
+                rightDown++;
                 grid++;
             } else break;
         grid = 1;
         while (grid <= 4)
             if (xPos - grid >= 0 && yPos - grid >= 0 && map[xPos - grid][yPos - grid] == color) {
-                leftup++;
+                leftUp++;
                 grid++;
             } else break;
-        if (rightdown + leftup >= 4) {
+        if (rightDown + leftUp >= 4) {
             SwingUtilities.invokeLater(() -> {
                 if (color == selfColor) {
                     frame.notify.append("You Win!" + System.getProperty("line.separator"));
@@ -609,17 +584,17 @@ class GobangPane extends JPanel {
         }
         grid = 1;
         while (grid <= 4)
-            if (xPos + grid < LIMT && yPos - grid >= 0 && map[xPos + grid][yPos - grid] == color) {
-                rightup++;
+            if (xPos + grid < limit && yPos - grid >= 0 && map[xPos + grid][yPos - grid] == color) {
+                rightUp++;
                 grid++;
             } else break;
         grid = 1;
         while (grid <= 4)
-            if (xPos - grid >= 0 && yPos + grid < LIMT && map[xPos - grid][yPos + grid] == color) {
-                leftdown++;
+            if (xPos - grid >= 0 && yPos + grid < limit && map[xPos - grid][yPos + grid] == color) {
+                leftDown++;
                 grid++;
             } else break;
-        if (rightup + leftdown >= 4) {
+        if (rightUp + leftDown >= 4) {
             SwingUtilities.invokeLater(() -> {
                 if (color == selfColor) {
                     frame.notify.append("You Win!" + System.getProperty("line.separator"));
@@ -637,7 +612,7 @@ class GobangPane extends JPanel {
         }
         grid = 1;
         while (grid <= 4)
-            if (yPos + grid < LIMT && map[xPos][yPos + grid] == color) {
+            if (yPos + grid < limit && map[xPos][yPos + grid] == color) {
                 down++;
                 grid++;
             } else break;
@@ -667,8 +642,8 @@ class GobangPane extends JPanel {
     }
 
     public void clearChess() {
-        for (int i = 0; i < LIMT; i++)
-            for (int j = 0; j < LIMT; j++)
+        for (int i = 0; i < limit; i++)
+            for (int j = 0; j < limit; j++)
                 map[i][j] = 0;
     }
 
